@@ -47,16 +47,23 @@ namespace MVCWebApp.Controllers
         // more details see https://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Create([Bind(Include = "ID,LastName,FirstMidName,EnrollmentDate")] StudentEntity studentEntity)
+        public ActionResult Create([Bind(Include = "LastName, FirstMidName, EnrollmentDate")] StudentEntity student)
         {
-            if (ModelState.IsValid)
+            try
             {
-                db.Students.Add(studentEntity);
-                db.SaveChanges();
-                return RedirectToAction("Index");
+                if (ModelState.IsValid)
+                {
+                    db.Students.Add(student);
+                    db.SaveChanges();
+                    return RedirectToAction("Index");
+                }
             }
-
-            return View(studentEntity);
+            catch (DataException /* dex */)
+            {
+                //Log the error (uncomment dex variable name and add a line here to write a log.
+                ModelState.AddModelError("", "Unable to save changes. Try again, and if the problem persists see your system administrator.");
+            }
+            return View(student);
         }
 
         // GET: StudentEntities/Edit/5
@@ -73,46 +80,73 @@ namespace MVCWebApp.Controllers
             }
             return View(studentEntity);
         }
+      
 
         // POST: StudentEntities/Edit/5
         // To protect from overposting attacks, enable the specific properties you want to bind to, for 
         // more details see https://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
+        [HttpPost, ActionName("Edit")]
         [ValidateAntiForgeryToken]
-        public ActionResult Edit([Bind(Include = "ID,LastName,FirstMidName,EnrollmentDate")] StudentEntity studentEntity)
-        {
-            if (ModelState.IsValid)
-            {
-                db.Entry(studentEntity).State = EntityState.Modified;
-                db.SaveChanges();
-                return RedirectToAction("Index");
-            }
-            return View(studentEntity);
-        }
-
-        // GET: StudentEntities/Delete/5
-        public ActionResult Delete(int? id)
+        public ActionResult EditPost(int? id)
         {
             if (id == null)
             {
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
-            StudentEntity studentEntity = db.Students.Find(id);
-            if (studentEntity == null)
+            var studentToUpdate = db.Students.Find(id);
+            if (TryUpdateModel(studentToUpdate, "",
+               new string[] { "LastName", "FirstMidName", "EnrollmentDate" }))
+            {
+                try
+                {
+                    db.SaveChanges();
+
+                    return RedirectToAction("Index");
+                }
+                catch (DataException /* dex */)
+                {
+                    //Log the error (uncomment dex variable name and add a line here to write a log.
+                    ModelState.AddModelError("", "Unable to save changes. Try again, and if the problem persists, see your system administrator.");
+                }
+            }
+            return View(studentToUpdate);
+        }
+
+        // GET: StudentEntities/Delete/5
+        public ActionResult Delete(int? id, bool? saveChangesError = false)
+        {
+            if (id == null)
+            {
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
+            }
+            if (saveChangesError.GetValueOrDefault())
+            {
+                ViewBag.ErrorMessage = "Delete failed. Try again, and if the problem persists see your system administrator.";
+            }
+            StudentEntity student = db.Students.Find(id);
+            if (student == null)
             {
                 return HttpNotFound();
             }
-            return View(studentEntity);
+            return View(student);
         }
 
         // POST: StudentEntities/Delete/5
-        [HttpPost, ActionName("Delete")]
+        [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult DeleteConfirmed(int id)
+        public ActionResult Delete(int id)
         {
-            StudentEntity studentEntity = db.Students.Find(id);
-            db.Students.Remove(studentEntity);
-            db.SaveChanges();
+            try
+            {
+                StudentEntity student = db.Students.Find(id);
+                db.Students.Remove(student);
+                db.SaveChanges();
+            }
+            catch (DataException/* dex */)
+            {
+                //Log the error (uncomment dex variable name and add a line here to write a log.
+                return RedirectToAction("Delete", new { id = id, saveChangesError = true });
+            }
             return RedirectToAction("Index");
         }
 
@@ -124,5 +158,6 @@ namespace MVCWebApp.Controllers
             }
             base.Dispose(disposing);
         }
+
     }
 }
